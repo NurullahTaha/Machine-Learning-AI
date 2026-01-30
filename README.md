@@ -63,6 +63,22 @@ This is the most complex component, designed for image recognition tasks (like C
     pip install numpy matplotlib mnist
     ```
 
+3.  **Dataset Setup (Required for Training):**
+    To train the model using `cifar10.py`, you need the **CIFAR-10 python version** dataset.
+    
+    *   **Download:** [CIFAR-10 Python Version](https://www.cs.toronto.edu/~kriz/cifar-10-python.tar.gz)
+    *   **Extract:** Unzip the downloaded file.
+    *   **Place:** Move the extracted folder named `cifar-10-batches-py` into the root directory of this project.
+    
+    Your folder structure should look like this:
+    ```text
+    Machine-Learning-AI/
+    ├── cifar-10-batches-py/  <-- The dataset folder
+    ├── cifar10.py
+    ├── run_model.py
+    └── ...
+    ```
+
 ## 🎮 Usage
 
 ### Interactive Digit Recognizer
