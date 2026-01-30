@@ -1,7 +1,7 @@
 import numpy as np
 import mnist
 # import scipy.misc
-# import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
 import pickle
 import os
 
