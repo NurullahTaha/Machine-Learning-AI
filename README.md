@@ -8,16 +8,18 @@ This project is a deep learning library and application built entirely from scra
 *   **Custom Layers:**
     *   **Dense (Fully Connected) Layers:** Standard neural network layers.
     *   **Convolutional Layers:** Implements 2D convolution for image processing.
+    *   **Pooling Layers:** Implements Average Pooling for spatial dimension reduction.
 *   **Activation Functions:**
     *   **ReLU:** Rectified Linear Unit for hidden layers.
     *   **Sigmoid:** For output/binary classification.
+    *   **Softmax:** For multi-class classification probabilities (used in CIFAR-10).
 *   **Interactive Demo:** Includes a GUI tool (`run_model.py`) where you can draw digits (0-9) and have the AI predict them in real-time.
 
 ## 📂 Code Structure & Implementation Details
 
 The core philosophy of this project is to implement every component of a neural network manually. Here is how the codebase is organized:
 
-### 1. The Building Blocks (`cifar10.py` & `ANN.py`)
+### 1. The Building Blocks (`cifar10.py` & `digit_trainer.py`)
 *   **`BaseLayer`**: An abstract parent class that defines the blueprint for all layers (`forward`, `backward`, `update`).
 *   **`Network` Class**:
     *   Acts as the container for the model.
@@ -37,15 +39,29 @@ This is the most complex component, designed for image recognition tasks (like C
 *   **Backward Pass**:
     *   Calculates gradients for **Filters** (`d_filter`), **Biases** (`d_biases`), and the **Input** (`d_inputs`) to pass gradients to the previous layer.
 
-### 3. Dense & Utility Layers
+### 3. Pooling Layer (`Pooling_Layer`)
+Used to reduce the spatial dimensions (Width x Height) of the input volume.
+*   **Method**: Implements **Average Pooling**.
+*   **Forward Pass**:
+    *   Slides a window (defined by `p_size`) over the input.
+    *   Calculates the **mean** value of pixels within that window.
+*   **Backward Pass**:
+    *   Distributes the gradient equally to all input elements that contributed to the average.
+    *   Formula: $ dInput = \frac{dOutput}{PoolHeight \times PoolWidth} $
+
+### 4. Dense & Utility Layers
 *   **`Layer_Dense`**: A standard fully connected layer.
     *   **Forward**: $Y = X \cdot W + B$
     *   **Backward**: Computes gradients $dW$, $dB$, and $dE$ (error w.r.t input).
 *   **`Conversion` Layer**:
     *   Acts as a bridge between 3D Convolutional layers and 1D Dense layers.
     *   **Flattening**: Reshapes the $(Batch, Depth, Height, Width)$ output of a Conv layer into a $(Batch, N)$ vector.
+*   **`Softmax` Layer**:
+    *   Combines **Softmax Activation** and **Categorical Crossentropy Loss** for numerical stability.
+    *   **Forward**: Converts raw scores (logits) into probabilities using $ \frac{e^{z_i}}{\sum e^{z_j}} $.
+    *   **Backward**: Computes the gradient of the loss with respect to inputs: $ P_{pred} - Y_{true} $.
 
-### 4. Data Handling
+### 5. Data Handling
 *   **CIFAR-10 Loader**: The script manually unpickles the official CIFAR-10 data batches.
 *   **Preprocessing**: Images are normalized (divided by 255) to the range [0, 1]. Labels are one-hot encoded.
 
@@ -108,6 +124,3 @@ This project implements the core components of Deep Learning:
 *   **Forward Propagation**: Computing the output by passing inputs through layers.
 *   **Backpropagation**: Calculating gradients of the loss function with respect to weights using the Chain Rule.
 *   **Gradient Descent**: Updating weights to minimize the error.
-*
-*
-*
