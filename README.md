@@ -108,3 +108,6 @@ This project implements the core components of Deep Learning:
 *   **Forward Propagation**: Computing the output by passing inputs through layers.
 *   **Backpropagation**: Calculating gradients of the loss function with respect to weights using the Chain Rule.
 *   **Gradient Descent**: Updating weights to minimize the error.
+*
+*
+*
