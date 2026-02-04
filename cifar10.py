@@ -171,6 +171,70 @@ class Convolution_Layer(BaseLayer):
 
         pass
 
+class Pooling_Layer(BaseLayer):
+    def __init__(self, p_size, stride):
+        self.p_size = p_size
+        self.stride = stride
+
+    def forward(self, n_inputs):
+        self.n_inputs = n_inputs
+
+        self.batch_size = n_inputs.shape[0]
+        self.n_channels = n_inputs.shape[1]
+        self.height = n_inputs.shape[2]
+        self.width = n_inputs.shape[3]
+
+        self.output_h = int((((self.height - self.p_size) / self.stride) + 1))
+        self.output_w = int((((self.width - self.p_size) / self.stride) + 1))
+
+        self.output = np.zeros(self.batch_size, self.n_channels, self.output_h, self.output_w)
+
+        for image in range(self.batch_size):
+            for channel in range(self.n_channels):
+                for height in range(self.output_h):
+                    for width in range(self.output_w):
+
+                        height_start = height * self.stride
+                        width_start = width * self.stride
+
+                        height_end = height_start + self.p_size
+                        width_end = width_start + self.p_size
+
+                        patch = self.n_inputs[image, channel, height_start : height_end, width_start : width_end]
+                        self.output[image, channel, height, width] = np.mean(patch)
+
+
+        
+        return self.output
+
+
+    def backward(self, out_error):
+
+        self.input_gradient = np.zeros(self.batch_size, self.n_channels, self.height, self.width)
+
+        self.patch_area = self.p_size * self.p_size
+
+        for image in range(self.batch_size):
+            for channel in range(self.n_channels):
+                for height in range(self.output_h):
+                    for width in range(self.output_w):
+
+                        height_start = height * self.stride
+                        width_start = width * self.stride
+
+                        height_end = height_start + self.p_size
+                        width_end = width_start + self.p_size
+
+                        self.current_error = out_error[image, channel, height, width]
+
+                        self.input_gradient[image, channel, height_start : height_end, width_start : width_end] += self.current_error / self.patch_area
+        
+        return self.input_gradient
+
+
+    def update(self, learning_rate):
+        pass
+
 
 class Conversion(BaseLayer):
     def forward(self, n_inputs):
@@ -263,7 +327,7 @@ def one_hot(labels):
 y_test = one_hot(raw_test_labels)
 y_train = one_hot(raw_train_labels)
 
-LIMIT = 15000
+LIMIT = 1000
 split = int(LIMIT * 0.8)
 #val_end = int(LIMIT * 0.9)
 
@@ -323,7 +387,7 @@ print("Training started...")
 
 batch_size = 1
 
-for epoch in range(200): 
+for epoch in range(10): 
     error_sum = 0
     for i in range(0, len(X_train), batch_size):
         img = X_train[i: i + batch_size] 
