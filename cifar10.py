@@ -187,7 +187,7 @@ class Pooling_Layer(BaseLayer):
         self.output_h = int((((self.height - self.p_size) / self.stride) + 1))
         self.output_w = int((((self.width - self.p_size) / self.stride) + 1))
 
-        self.output = np.zeros(self.batch_size, self.n_channels, self.output_h, self.output_w)
+        self.output = np.zeros((self.batch_size, self.n_channels, self.output_h, self.output_w))
 
         for image in range(self.batch_size):
             for channel in range(self.n_channels):
@@ -210,7 +210,7 @@ class Pooling_Layer(BaseLayer):
 
     def backward(self, out_error):
 
-        self.input_gradient = np.zeros(self.batch_size, self.n_channels, self.height, self.width)
+        self.input_gradient = np.zeros((self.batch_size, self.n_channels, self.height, self.width))
 
         self.patch_area = self.p_size * self.p_size
 
@@ -249,6 +249,61 @@ class Conversion(BaseLayer):
     def update(self, learning_rate):
         pass
 
+class Softmax(BaseLayer):
+    def __init__(self):
+        self.activation = Activation_Softmax()
+        self.loss = Loss_CategoricalCrossentropy()
+
+    def forward(self, inputs):
+        self.activation.forward(inputs)
+        self.output = self.activation.output
+        return self.output
+
+    def backward(self, dvalues, y_true):
+        # Number of samples
+        samples = len(dvalues)
+
+        # If labels are one-hot encoded, turn them into discrete values
+        if len(y_true.shape) == 2:
+            y_true = np.argmax(y_true, axis=1)
+
+        # Copy the softmax predictions
+        self.d_inputs = dvalues.copy()
+
+        # Calculate gradient: Prediction - Ground Truth
+        self.d_inputs[range(samples), y_true] -= 1
+        
+        # Normalize gradient
+        self.d_inputs = self.d_inputs / samples
+        
+        return self.d_inputs
+
+    def update(self, learning_rate):
+        pass # Nothing to update here
+
+# Helper classes needed for the above combo
+class Activation_Softmax(BaseLayer):
+    def forward(self, inputs):
+        exp_values = np.exp(inputs - np.max(inputs, axis=1, keepdims=True))
+        probabilities = exp_values / np.sum(exp_values, axis=1, keepdims=True)
+        self.output = probabilities
+        
+    def backward(self, dvalues):
+        self.d_inputs = dvalues # Placeholder if used separately
+
+class Loss_CategoricalCrossentropy(BaseLayer):
+    def calculate(self, output, y):
+        # Calculate loss (just for printing/tracking)
+        samples = len(output)
+        output_clipped = np.clip(output, 1e-7, 1 - 1e-7)
+        
+        if len(y.shape) == 2:
+            confidences = np.sum(output_clipped * y, axis=1)
+        elif len(y.shape) == 1:
+            confidences = output_clipped[range(samples), y]
+            
+        return np.mean(-np.log(confidences))
+
 class Network:
     def __init__(self):
         self.layers = []
@@ -268,16 +323,16 @@ class Network:
     
 
     def backward(self, targets):
+        last_layer = self.layers[-1]
         
-        loss = self.net_out - targets
+        d_inputs = last_layer.backward(self.net_out, targets)
 
-        # Reverse iterate layers
-        for layer in self.layers[::-1]:
-            loss = layer.backward(loss) 
+        for layer in reversed(self.layers[:-1]):
+            d_inputs = layer.backward(d_inputs) 
 
     def update(self):
         for layer in self.layers:
-            layer.update(0.1)
+            layer.update(0.05)
 
 
 
@@ -327,7 +382,7 @@ def one_hot(labels):
 y_test = one_hot(raw_test_labels)
 y_train = one_hot(raw_train_labels)
 
-LIMIT = 1000
+LIMIT = 10000
 split = int(LIMIT * 0.8)
 #val_end = int(LIMIT * 0.9)
 
@@ -363,23 +418,19 @@ else:
     net = Network()
     net.add(Convolution_Layer(3, 16, 2, 3))
     net.add(Activation_ReLu())
+
+    net.add(Pooling_Layer(2, 2))
+
     net.add(Conversion())
 
-    net.add(Layer_Dense(3600, 128))   
+    net.add(Layer_Dense(784, 128))   
     net.add(Activation_ReLu())
-
-    # net.add(Conversion())
-    # net.add(Layer_Dense(1024*3, 128))   
-    # net.add(Activation_ReLu())
 
     net.add(Layer_Dense(128, 64))
     net.add(Activation_ReLu())
 
-    net.add(Layer_Dense(64, 64))
-    net.add(Activation_ReLu())
-
     net.add(Layer_Dense(64, 10))
-    net.add(Activation())
+    net.add(Softmax())
 
 # 4. TRAIN
 
@@ -397,7 +448,8 @@ for epoch in range(10):
         net.backward(target)
         net.update()
         
-        error_sum += np.mean(np.square(target - net.net_out))
+        loss_val = -np.sum(target * np.log(net.net_out + 1e-7)) / len(target)
+        error_sum += loss_val
 
     #Validation
 
@@ -452,13 +504,16 @@ print("\n--- VISUAL TEST ---")
 # Names for CIFAR-10
 class_names = ['Plane', 'Car', 'Bird', 'Cat', 'Deer', 'Dog', 'Frog', 'Horse', 'Ship', 'Truck']
 
+# Pick a random image
 idx = np.random.randint(0, len(X_test))
-sample = X_test[idx:idx+1]
-true_label = np.argmax(y_test[idx]) # Decode one-hot back to number
+sample = X_test[idx:idx+1] # Shape: (1, 3, 32, 32)
+true_label = np.argmax(y_test[idx]) 
 
+# Run Prediction
 probs = net.forward(sample)
 pred_idx = np.argmax(probs)
 
+# Print Text Results
 print(f"True Label: {class_names[true_label]}")
 print("Network's Confidence:")
 for i in range(10):
@@ -467,8 +522,15 @@ for i in range(10):
 
 print(f"\n> Final Prediction: {class_names[pred_idx]}")
 
-# Show Image (32x32 now!)
+# Display Image
+# 1. Reshape from (1, 3, 32, 32) -> (3, 32, 32)
+# 2. Transpose to (32, 32, 3) for Matplotlib
 image_grid = sample.reshape(3, 32, 32).transpose(1, 2, 0)
-plt.imshow(image_grid, cmap='gray')
+
+plt.figure(figsize=(4,4)) # Create a dedicated window
+plt.imshow(image_grid)    # Removed cmap='gray' (It's a color image!)
 plt.title(f"True: {class_names[true_label]} | Pred: {class_names[pred_idx]}")
-plt.show()
+plt.axis('off')           # Hide ugly axis numbers
+
+# block=True forces the window to stay open until you close it
+plt.show(block=True)
